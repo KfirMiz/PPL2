@@ -208,7 +208,7 @@ const isPrimitiveOp = (x: string): boolean =>
     ["+", "-", "*", "/", ">", "<", "=", "not", "and", "or",
      "eq?", "string=?", "cons", "car", "cdr", "list", "pair?",
      "number?", "boolean?", "symbol?", "string?",
-     "dict", "dict?", "get"].includes(x);
+     "dict", "dict?", "get"].includes(x); // ======================================= NEW 
 
 const isSpecialForm = (x: string): boolean =>
     ["if", "lambda", "let", "quote"].includes(x);
