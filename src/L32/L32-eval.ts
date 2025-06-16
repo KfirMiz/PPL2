@@ -1,6 +1,6 @@
 // L32-eval.ts
 import { map } from "ramda";
-import { isCExp, isLetExp } from "./L32-ast";
+import { DictExp, isCExp, isDictExp, isLetExp } from "./L32-ast"; // ADDED isDictExp
 import { BoolExp, CExp, Exp, IfExp, LitExp, NumExp,
          PrimOp, ProcExp, Program, StrExp, VarDecl } from "./L32-ast";
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLitExp, isNumExp,
@@ -8,7 +8,7 @@ import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLitExp, isNumExp,
 import { makeBoolExp, makeLitExp, makeNumExp, makeProcExp, makeStrExp } from "./L32-ast";
 import { parseL32Exp } from "./L32-ast";
 import { applyEnv, makeEmptyEnv, makeEnv, Env } from "./L32-env";
-import { isClosure, makeClosure, Closure, Value } from "./L32-value";
+import { isClosure, makeClosure, Closure, Value, SExpValue, isEmptySExp, makeCompoundSExp } from "./L32-value";
 import { first, rest, isEmpty, List, isNonEmptyList } from '../shared/list';
 import { isBoolean, isNumber, isString } from "../shared/type-predicates";
 import { Result, makeOk, makeFailure, bind, mapResult, mapv } from "../shared/result";
@@ -17,6 +17,7 @@ import { applyPrimitive } from "./evalPrimitive";
 import { parse as p } from "../shared/parser";
 import { Sexp } from "s-expression";
 import { format } from "../shared/format";
+import { DictValue, makeDictValue, isDictValue, isSymbolSExp } from "./L32-value"; //======================================= NEW
 
 // ========================================================
 // Eval functions
@@ -33,11 +34,30 @@ const L32applicativeEval = (exp: CExp, env: Env): Result<Value> =>
     isAppExp(exp) ? bind(L32applicativeEval(exp.rator, env), (rator: Value) =>
                         bind(mapResult(param => L32applicativeEval(param, env), exp.rands), (rands: Value[]) =>
                             L32applyProcedure(rator, rands, env))) :
-    isLetExp(exp) ? makeFailure('"let" not supported (yet)') :
+    isLetExp(exp) ? makeFailure('"let" not supported (yet)') :  
+    isDictExp(exp) ? evalDict(exp, env) : //======================================= NEW
     exp;
 
 export const isTrueValue = (x: Value): boolean =>
     ! (x === false);
+
+// ======================================= NEW - START
+const evalDict = (dict: DictExp, env: Env): Result<Value> => {
+    const keyNames = dict.keys.map(k => k.var);
+
+    // Check for duplicates
+    const hasDuplicates = new Set(keyNames).size !== keyNames.length;
+    if (hasDuplicates) {
+        return makeFailure("Duplicate keys are not allowed in a dict");
+    }
+
+    return bind(
+        mapResult(param => L32applicativeEval(param, env), dict.values),
+        (values: Value[]) =>
+            makeOk(makeDictValue(keyNames, values))
+    );
+};
+// ======================================= NEW - END
 
 const evalIf = (exp: IfExp, env: Env): Result<Value> =>
     bind(L32applicativeEval(exp.test, env), (test: Value) => 
@@ -50,6 +70,7 @@ const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
 const L32applyProcedure = (proc: Value, args: Value[], env: Env): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
     isClosure(proc) ? applyClosure(proc, args, env) :
+    isDictValue(proc) ? applyDictValue(proc, args[0]) : // ======================================= NEW
     makeFailure(`Bad procedure ${format(proc)}`);
 
 // Applications are computed by substituting computed
@@ -70,6 +91,16 @@ const applyClosure = (proc: Closure, args: Value[], env: Env): Result<Value> => 
     const litArgs = map(valueToLitExp, args);
     return evalSequence(substitute(body, vars, litArgs), env);
 }
+
+// ======================================= NEW - START
+const applyDictValue = (proc: DictValue, key: Value): Result<Value> => {
+    if (!isSymbolSExp(key)) {
+        return makeFailure("Invalid key: must be a SymbolSExp");
+    }
+    const index = proc.keys.indexOf(key.val);
+    return index !== -1 ? makeOk(proc.values[index]) : makeFailure(`Key '${key.val}' not found in dictionary`);
+};
+// ======================================= NEW - END
 
 // Evaluate a sequence of expressions (in a program)
 export const evalSequence = (seq: List<Exp>, env: Env): Result<Value> =>

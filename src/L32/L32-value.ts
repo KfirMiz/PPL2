@@ -1,7 +1,7 @@
 // ========================================================
 // Value type definition for L3
 
-import { isPrimOp, CExp, PrimOp, VarDecl } from './L32-ast';
+import { isPrimOp, CExp, PrimOp, VarDecl, VarRef } from './L32-ast';
 import { isNumber, isArray, isString } from '../shared/type-predicates';
 import { append } from 'ramda';
 
@@ -35,12 +35,26 @@ export type SymbolSExp = {
     tag: "SymbolSExp";
     val: string;
 }
+// ======================================= NEW - START
+export type DictValue = {
+    tag: "DictValue";
+    keys: string[];
+    values: SExpValue[];
+}
+// ======================================= NEW - END
 
-export type SExpValue = number | boolean | string | PrimOp | Closure | SymbolSExp | EmptySExp | CompoundSExp;
+export type SExpValue = number | boolean | string | PrimOp | Closure | SymbolSExp | EmptySExp | CompoundSExp
+                      | DictValue; // ======================================= NEW
 export const isSExp = (x: any): x is SExpValue =>
     typeof(x) === 'string' || typeof(x) === 'boolean' || typeof(x) === 'number' ||
-    isSymbolSExp(x) || isCompoundSExp(x) || isEmptySExp(x) || isPrimOp(x) || isClosure(x);
+    isSymbolSExp(x) || isCompoundSExp(x) || isEmptySExp(x) || isPrimOp(x) || isClosure(x)
+ || isDictValue(x); // ======================================= NEW
 
+// ======================================= NEW - START
+export const makeDictValue = (keyss: string[], valuess: SExpValue[]): DictValue =>
+    ({tag: "DictValue", keys: keyss, values: valuess});
+export const isDictValue = (x: any): x is DictValue => x.tag === "DictValue";
+// ======================================= NEW - END
 export const makeCompoundSExp = (val1: SExpValue, val2: SExpValue): CompoundSExp =>
     ({tag: "CompoundSexp", val1: val1, val2 : val2});
 export const isCompoundSExp = (x: any): x is CompoundSExp => x.tag === "CompoundSexp";
@@ -80,4 +94,5 @@ export const valueToString = (val: Value): string =>
     isSymbolSExp(val) ? val.val :
     isEmptySExp(val) ? "'()" :
     isCompoundSExp(val) ? compoundSExpToString(val) :
+    isDictValue(val) ? `(dict ${val.keys.map((k, i) => `(${k} ${valueToString(val.values[i])})`).join(" ")})` : // ======================================= NEW (may not be true) 
     val;
