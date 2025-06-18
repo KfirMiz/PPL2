@@ -6,8 +6,8 @@
   (lambda (p)
     (and (pair? p)
          (symbol? (car p))
-         (not (pair? (cdr p)))
-         (not (null? (cdr p))))))
+         (if (pair? (cdr p)) #f #t)
+         (if (null? (cdr p)) #f #t))))
 
 (define all-dotted-pairs?
   (lambda (lst)
@@ -68,7 +68,7 @@
 (define is-error?
   (lambda (val)
     (if (pair? val)
-        (eq? (car val) 'error)
+        (if (eq? (car val) 'error) #t #f)
         #f)))
 
 (define bind
